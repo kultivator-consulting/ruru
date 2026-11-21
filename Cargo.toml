@@ -1,0 +1,78 @@
+[workspace]
+resolver = "3"
+members = [
+    "crates/ruru-client",
+    "crates/ruru-source",
+    "crates/ruru-mcp",
+    "examples/ruru-tap",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.88"
+authors = ["Kultivator Consulting"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/kultivator-consulting/ruru"
+publish = false
+
+[workspace.dependencies]
+ruru-client = { path = "crates/ruru-client" }
+ruru-source = { path = "crates/ruru-source" }
+
+anyhow = "1"
+async-stream = "0.3"
+bytes = "1"
+clap = { version = "4", features = ["derive", "env"] }
+futures-core = "0.3"
+indexmap = { version = "2", features = ["serde"] }
+jpeg-encoder = "0.7"
+nix = { version = "0.31", features = ["user", "fs"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+# V4L2 device layer. Default `v4l2` feature = pure ioctls (no libv4l C dep),
+# so it cross-compiles to static musl on x86_64 and aarch64. Validated against the Brio.
+v4l = "0.14"
+tokio = { version = "1.53", features = [
+    "rt-multi-thread",
+    "net",
+    "sync",
+    "io-util",
+    "macros",
+    "time",
+    "signal",
+] }
+
+# ruru-mcp: HTTP, auth, image pipeline, SPA embedding
+axum = "0.8"
+axum-extra = { version = "0.12", features = ["cookie", "cookie-private"] }
+argon2 = "0.5"
+base64 = "0.22"
+image = { version = "0.25", default-features = false, features = ["jpeg"] }
+mime_guess = "2"
+rand = "0.8"
+rpassword = "7"
+rust-embed = { version = "8", features = ["mime-guess"] }
+sha2 = "0.10"
+subtle = "2"
+# dev
+reqwest = { version = "0.12", default-features = false, features = [
+    "json",
+    "cookies",
+    "stream",
+] }
+# preserve_order: without it, toml deserializes tables through a sorted intermediate, so
+# [camera.controls] would arrive alphabetically and defeat the gate-before-gated ordering
+# that ruru-source relies on. See config::controls.
+toml = { version = "0.9", features = ["preserve_order"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# dev
+tempfile = "3"
+
+[profile.release]
+strip = true
+lto = "thin"
+codegen-units = 1

@@ -1,0 +1,28 @@
+# ruru-mcp — local development.
+#
+#   # bootstrap secrets (once):
+#   cargo run -p ruru-mcp -- --config config/mcp-dev.toml set-password
+#   cargo run -p ruru-mcp -- --config config/mcp-dev.toml mint-key
+#   # then run the source (mock) and the mcp server:
+#   cargo run -p ruru-source -- --config config/dev.toml
+#   cargo run -p ruru-mcp    -- --config config/mcp-dev.toml
+#
+# The SPA is served from the embedded build; run `make web-build` first, or use the Vite
+# dev server (`make web-dev`) which proxies /mcp and /api here.
+
+[server]
+bind = "127.0.0.1:8080"
+
+[source]
+# Matches config/dev.toml's socket.
+socket_path = "/tmp/ruru-source.sock"
+
+[pipeline]
+max_edge = 1568
+jpeg_quality = 85
+
+[secrets]
+path = "/tmp/ruru-mcp-secrets.toml"
+
+[calibration]
+path = "/tmp/ruru-calibration.json"

@@ -1,0 +1,31 @@
+# ruru-source — local development.
+#
+#   cargo run -p ruru-source -- --config config/dev.toml
+#
+# No hardware and no `ruru` group needed: the mock camera emits real MJPEG with the
+# frame number burned into the image.
+
+[source]
+socket_path = "/tmp/ruru-source.sock"
+
+# Deliberately unset in dev. Set it (to "ruru") only where the group exists and this
+# user belongs to it — when set and the chown fails, the daemon aborts rather than
+# serve on a socket whose ownership is the entire access control on that hop.
+# socket_group = "ruru"
+
+pin = false
+enabled = true
+idle_grace_secs = 10
+
+[camera]
+backend = "mock"
+width = 1280
+height = 720
+fps = 30
+warmup_frames = 1
+mock_jpeg_quality = 80
+
+[camera.controls]
+# The mock accepts the same names the real device is expected to use, so a config that
+# works here is one fewer variable on real hardware.
+brightness = 128

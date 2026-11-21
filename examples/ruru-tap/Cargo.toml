@@ -1,0 +1,21 @@
+[package]
+name = "ruru-tap"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+description = "Subscribes to ruru-source and logs frame stats — proof of multi-consumer fan-out."
+
+[[bin]]
+name = "ruru-tap"
+path = "src/main.rs"
+
+[dependencies]
+ruru-client.workspace = true
+
+anyhow.workspace = true
+clap.workspace = true
+tokio.workspace = true

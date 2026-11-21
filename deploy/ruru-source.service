@@ -1,0 +1,43 @@
+[Unit]
+Description=Ruru frame source — owns the Brio, fans frames out over a Unix socket
+Documentation=https://github.com/kultivator-consulting/ruru
+# The camera is USB; wait for the device layer to settle. No dependency on ruru-mcp:
+# the source is the producer and knows nothing about its consumers.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+# Non-root. Group `ruru` is the socket boundary; supplementary `video` opens the device.
+User=ruru-source
+Group=ruru
+SupplementaryGroups=video
+ExecStart=/usr/local/bin/ruru-source --config /etc/ruru/source.toml
+Restart=on-failure
+RestartSec=2
+
+# /run/ruru, 0750 ruru-source:ruru — the socket lives here. Group `ruru` (which ruru-mcp
+# is in) can traverse the dir; the socket inside is 0660 group ruru. Creating the dir up
+# front is what closes the window between bind() and chmod() in the daemon.
+RuntimeDirectory=ruru
+RuntimeDirectoryMode=0750
+
+# /var/lib/ruru-source, 0700 ruru-source — persists operator control tuning (controls.json)
+# across restarts. Separate from the read-only /etc config the daemon cannot write to.
+StateDirectory=ruru-source
+StateDirectoryMode=0700
+
+# Hardening. NOTE: no PrivateDevices — the whole job is to open /dev/video*. Instead the
+# device cgroup is scoped to video4linux (systemd still allows the null/zero/urandom set).
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+DeviceAllow=char-video4linux rw
+
+[Install]
+WantedBy=multi-user.target

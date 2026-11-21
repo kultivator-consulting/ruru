@@ -1,0 +1,44 @@
+# ruru-mcp — production config. Installed to /etc/ruru/mcp.toml by deploy/install.sh
+# (only if that file doesn't already exist, so your edits survive a re-install).
+#
+# This file is world-readable and holds no secrets — the secrets live in the 0600 file under
+# [secrets] below, written by `set-password` / `mint-key` and owned by the ruru-mcp user.
+
+[server]
+# LAN-reachable so agents on other machines can read the board. Bearer-gated but plain HTTP
+# (LAN-only, no TLS) — the key crosses the LAN in cleartext, so scope the port to the office
+# subnet at the firewall (see docs/deploy-runbook.md).
+bind = "0.0.0.0:8080"
+
+[source]
+# Matches ruru-source's RuntimeDirectory socket.
+socket_path = "/run/ruru/source.sock"
+
+[pipeline]
+# ~1568 px longest edge on capture_whiteboard: enough for a model to read a whole board,
+# small enough to stay cheap. capture_region is the full-resolution escape hatch.
+max_edge = 1568
+jpeg_quality = 85
+
+[secrets]
+# 0600, owned by ruru-mcp, on the StateDirectory (/var/lib/ruru, 0700). Never in /etc.
+path = "/var/lib/ruru/mcp-secrets.toml"
+
+[calibration]
+# Corner homography + board aspect, hot-# Retained snapshots — OFF by default. When on, every capture_whiteboard / capture_region is
+# written to `dir` and served at <public_base_url>/captures/<id>.jpg, so the agent can hand
+# the user a link to the exact frame it read.
+#
+# Read this before turning it on: the serving route is UNAUTHENTICATED (a browser link must
+# just work). The id is an unguessable 128-bit capability token, so the link itself is the
+# secret — anyone who has it can open the image until it is pruned. Fine for a LAN-only
+# whiteboard; think twice if your board ever holds anything sensitive.
+#
+# public_base_url MUST be an origin reachable by whoever opens the links (another LAN host,
+# a phone). A LAN IP usually resolves from more devices than a hostname does.
+#
+# [captures]
+# dir = "/var/lib/ruru/captures"
+# public_base_url = "http://<lan-ip-or-hostname>:8080"
+# retain_days = 7
+# retain_count = 200

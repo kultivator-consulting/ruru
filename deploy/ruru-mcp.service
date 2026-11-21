@@ -1,0 +1,42 @@
+[Unit]
+Description=Ruru MCP endpoint + admin panel
+Documentation=https://github.com/kultivator-consulting/ruru
+# Ordered after the source so a cold boot starts them in the sensible order, but NOT
+# Requires= — ruru-mcp tolerates the source being down and reconnects on the next capture,
+# so a source bounce must not take ruru-mcp with it. (Verified: a source restart leaves the
+# ruru-mcp process untouched and the next capture succeeds.)
+After=ruru-source.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+# Non-root. Group `ruru` grants the source socket; ruru-mcp is deliberately NOT in `video`,
+# so it cannot open the camera even if it wanted to — frames only ever arrive via the socket.
+User=ruru-mcp
+Group=ruru
+ExecStart=/usr/local/bin/ruru-mcp --config /etc/ruru/mcp.toml
+Restart=on-failure
+RestartSec=2
+
+# /var/lib/ruru, 0700 ruru-mcp — mutable state the source never sees: the 0600 secrets file
+# (bearer hash, admin argon2id, cookie key) and calibration.json.
+StateDirectory=ruru
+StateDirectoryMode=0700
+
+# Hardening. ruru-mcp touches no devices, so lock it down hard.
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictRealtime=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+LockPersonality=true
+MemoryDenyWriteExecute=true
+
+[Install]
+WantedBy=multi-user.target

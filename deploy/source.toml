@@ -1,0 +1,80 @@
+# ruru-source — production config. Installed to /etc/ruru/source.toml by deploy/install.sh
+# (only if that file doesn't already exist, so your edits survive a re-install).
+#
+# Holds NO secrets. The bearer hash, admin password and cookie key all live with ruru-mcp
+# under /var/lib/ruru (0600).
+
+[source]
+# systemd's RuntimeDirectory=ruru creates /run/ruru as 0750 ruru-source:ruru before the
+# daemon starts — that is what closes the window between bind() and chmod().
+socket_path = "/run/ruru/source.sock"
+
+# Access control on the socket is the filesystem, not an application token: mode 0660 owned
+# by group `ruru`. Consumers (ruru-mcp, or your own) run as users in that group. If the chown
+# fails the daemon exits rather than downgrade the boundary silently.
+socket_group = "ruru"
+
+# An always-on camera pointed at an office is a surveillance capability. With the pin off,
+# the device is only open while a consumer is actually attached, and idle-closes
+# `idle_grace_secs` after the last one leaves. Leave it off unless something genuinely needs
+# frames with no client attached.
+pin = false
+enabled = true
+idle_grace_secs = 10
+
+# Operator control tuning from the admin panel is persisted here (systemd's
+# StateDirectory=ruru-source owns /var/lib/ruru-source) and layered over [camera.controls]
+# on every open, so it survives a restart. The /etc config is read-only to the daemon.
+controls_state_path = "/var/lib/ruru-source/controls.json"
+
+[camera]
+backend = "v4l2"
+
+# NEVER /dev/video0. UVC cameras often expose several video nodes and renumber them on
+# replug; only the by-id path is stable, and the config layer rejects anything outside
+# /dev/v4l/by-id/. Find yours with:
+#   ls -l /dev/v4l/by-id/
+# and pick the `-video-index0` entry. The serial number is part of the path, so re-check if
+# you swap the camera.
+device = "/dev/v4l/by-id/usb-046d_MX_Brio_XXXXXXXXXXXX-video-index0"
+
+# MJPG is passed through without decoding — consumers decode only if they need pixels.
+# 4K costs nothing on capture_whiteboard (it downscales) and gives capture_region far more
+# detail to crop from. Use whatever your camera supports: `v4l2-ctl --list-formats-ext`.
+fourcc = "MJPG"
+width = 3840
+height = 2160
+fps = 30
+
+# UVC devices need a few captures before exposure and white balance settle. Without this the
+# first frame after every open is garbage.
+warmup_frames = 6
+
+# Re-resolve by-id and reopen this long after a device failure. This is the replug path.
+reopen_backoff_secs = 2
+
+# Locked optics — reapplied on EVERY open, because a replugged device comes back at its
+# defaults. This is what makes two captures of the same board comparable.
+#
+# Names and ranges below are for the Logitech MX Brio; list yours with `v4l2-ctl -L`.
+#
+# ORDER MATTERS. Some controls are `inactive` until a companion auto control is switched off,
+# so each gate MUST be listed before the control it gates:
+#   * white_balance_automatic = 0     before  white_balance_temperature
+#   * auto_exposure = 1 (Manual)      before  exposure_time_absolute
+#   * focus_automatic_continuous = 0  before  focus_absolute
+# ruru-source applies these top-to-bottom and re-reads each one; a control that did not take
+# (usually a gate in the wrong place) is logged and shown in `status.last_error`.
+[camera.controls]
+white_balance_automatic = 0             # gate — must precede the temperature
+white_balance_temperature = 4000        # 2800..=7500 on the Brio
+auto_exposure = 1                       # menu: 1 = Manual, 3 = Aperture Priority
+exposure_time_absolute = 250            # 3..=2047; tune to the room
+# Mains frequency for your region, or fluorescent/LED lighting will band:
+# 0 = off, 1 = 50 Hz (most of the world), 2 = 60 Hz (the Americas, parts of Asia).
+power_line_frequency = 1
+
+# Focus is left on continuous autofocus. To pin it, uncomment BOTH lines, in this order, with
+# a value measured at your camera-to-board distance — an arbitrary value is worse than AF.
+# focus_automatic_continuous = 0
+# focus_absolute = 40
