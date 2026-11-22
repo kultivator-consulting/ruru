@@ -1437,7 +1437,6 @@ dependencies = [
  "bytes",
  "clap",
  "image",
- "jpeg-encoder",
  "mime_guess",
  "rand",
  "reqwest",

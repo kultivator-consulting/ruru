@@ -29,7 +29,6 @@ base64.workspace = true
 bytes.workspace = true
 clap.workspace = true
 image.workspace = true
-jpeg-encoder.workspace = true
 mime_guess.workspace = true
 rand.workspace = true
 rpassword.workspace = true
