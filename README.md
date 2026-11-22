@@ -15,6 +15,15 @@ admin panel for calibration and camera tuning. Nothing leaves your network.
 > Named after the **ruru** (morepork), New Zealand's small native owl. It watches quietly
 > and only when needed.
 
+| What the camera sees | What the agent gets (`capture_whiteboard`) |
+|---|---|
+| ![Raw 4K camera frame: the whiteboard seen off-angle](docs/images/raw-camera.jpg) | ![The same board dewarped to a head-on rectangle](docs/images/dewarped.jpg) |
+
+When handwriting is too small to read, `capture_region` pulls any part of the board at full
+4K resolution:
+
+<img src="docs/images/region-zoom.jpg" alt="A to-do list on the board, zoomed in at full resolution" width="420">
+
 ## How it works
 
 ```
@@ -96,7 +105,14 @@ sudo bash deploy/install.sh   # users, configs, systemd units
 ```
 
 Then set your camera's `/dev/v4l/by-id/…` path in `/etc/ruru/source.toml`, provision
-secrets, and calibrate the board in the admin panel. The full sequence (and uninstall) is in
+secrets, and calibrate the board in the admin panel.
+
+![Admin panel calibration: drag four corners on the live view, see the dewarped result beside it](docs/images/admin-calibration.jpg)
+
+The admin panel also lets you tune and lock the camera's controls (exposure, white balance,
+focus), which are re-applied every time the camera opens:
+
+![Admin panel camera controls](docs/images/admin-controls.png) The full sequence (and uninstall) is in
 the **[deploy runbook](docs/deploy-runbook.md)**.
 
 ## Security model

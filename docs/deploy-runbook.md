@@ -101,6 +101,12 @@ Then open `http://<host>:8080/`, sign in, and **calibrate** the board at `/calib
 (drag the four corners onto the board edges). Pointing an agent at it — endpoint, key, client
 config — is in the [`ruru-mcp` README](../crates/ruru-mcp/README.md).
 
+**Admin panel won't load from a phone?** On Android 17 and later, apps need the "Nearby
+devices" (local network access) permission to reach LAN addresses. Without it Chrome shows
+`ERR_TOO_MANY_RETRIES` and the request never leaves the phone. Allow it under
+Settings → Apps → Chrome → Permissions. Also type the URL with `http://`: Ruru serves plain
+HTTP unless you add the TLS proxy below.
+
 ## Network exposure (do this)
 
 `/mcp` binds `0.0.0.0:8080` so LAN agents can reach it, but it is plain HTTP — the bearer
