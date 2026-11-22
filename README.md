@@ -26,13 +26,14 @@ When handwriting is too small to read, `capture_region` pulls any part of the bo
 
 ## How it works
 
-```
-                 Unix socket (0660, group ruru)              HTTP :8080
-┌────────────┐   ┌──────────────┐   frames    ┌─────────────────────────┐   POST /mcp (bearer)   ┌──────────┐
-│ UVC camera ├──▶│ ruru-source  ├────────────▶│ ruru-mcp                ├───────────────────────▶│ AI agent │
-│ (MX Brio)  │   │ owns device, │  fan-out    │ dewarp · crop · resize  │                        └──────────┘
-└────────────┘   │ fans out     │  to N       │ MCP tools · admin SPA   │◀── browser: admin panel (password)
-                 └──────────────┘  clients    └─────────────────────────┘◀── browser: capture links (optional)
+```mermaid
+flowchart LR
+  cam["UVC camera<br/>(e.g. MX Brio)"] -->|V4L2| src["<b>ruru-source</b><br/>owns the device<br/>fans frames out"]
+  src -->|"Unix socket<br/>0660, group ruru"| mcp["<b>ruru-mcp</b><br/>dewarp · crop · resize<br/>MCP tools · admin SPA"]
+  src -.->|same socket| other["your own consumer<br/>(optional)"]
+  mcp -->|"POST /mcp<br/>bearer key"| agent["AI agent"]
+  admin["Browser"] -->|"admin panel<br/>password"| mcp
+  links["Browser"] -.->|"capture links<br/>(optional)"| mcp
 ```
 
 - **`ruru-source`** is the only process that opens the camera. A UVC device allows a single
