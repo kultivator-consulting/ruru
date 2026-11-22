@@ -169,24 +169,25 @@ pub async fn handle_connection(mut stream: UnixStream, capture: CaptureHandle, c
     }
 }
 
-async fn read_request(stream: &mut UnixStream, timeout: Duration) -> Result<Request, Response> {
+async fn read_request(
+    stream: &mut UnixStream,
+    timeout: Duration,
+) -> Result<Request, Box<Response>> {
     let message = tokio::time::timeout(timeout, proto::read_message(stream))
         .await
         .map_err(|_| {
-            Response::err(
+            bad_request(
                 ErrorCode::BadRequest,
                 format!("no request within {}s", timeout.as_secs()),
             )
         })?
-        .map_err(|e| Response::err(ErrorCode::BadRequest, format!("unreadable request: {e}")))?
-        .ok_or_else(|| {
-            Response::err(ErrorCode::BadRequest, "connection closed before a request")
-        })?;
+        .map_err(|e| bad_request(ErrorCode::BadRequest, format!("unreadable request: {e}")))?
+        .ok_or_else(|| bad_request(ErrorCode::BadRequest, "connection closed before a request"))?;
 
     let bytes = match message {
         Message::Json(bytes) => bytes,
         Message::Frame(_) => {
-            return Err(Response::err(
+            return Err(bad_request(
                 ErrorCode::BadRequest,
                 "expected a control message, got a frame",
             ));
@@ -194,10 +195,10 @@ async fn read_request(stream: &mut UnixStream, timeout: Duration) -> Result<Requ
     };
 
     let request: Request = serde_json::from_slice(&bytes)
-        .map_err(|e| Response::err(ErrorCode::BadRequest, format!("malformed request: {e}")))?;
+        .map_err(|e| bad_request(ErrorCode::BadRequest, format!("malformed request: {e}")))?;
 
     if request.v != PROTO_VERSION {
-        return Err(Response::err(
+        return Err(bad_request(
             ErrorCode::ProtoVersion,
             format!(
                 "this source speaks protocol v{PROTO_VERSION}, the client asked for v{}",
@@ -207,6 +208,11 @@ async fn read_request(stream: &mut UnixStream, timeout: Duration) -> Result<Requ
     }
 
     Ok(request)
+}
+
+/// Boxed so the `Err` arm stays small (`Response` is a few hundred bytes).
+fn bad_request(code: ErrorCode, message: impl Into<String>) -> Box<Response> {
+    Box::new(Response::err(code, message))
 }
 
 async fn serve_snapshot(

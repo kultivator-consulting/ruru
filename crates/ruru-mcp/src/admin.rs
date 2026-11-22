@@ -100,15 +100,15 @@ pub async fn login(
     ConnectInfo(peer): ConnectInfo<SocketAddr>,
     jar: PrivateCookieJar,
     Json(body): Json<LoginRequest>,
-) -> Result<(PrivateCookieJar, Json<serde_json::Value>), Response> {
+) -> Response {
     let ip = peer.ip();
     let _permit = match state.login_guard.check(ip) {
         LoginCheck::Allowed(permit) => permit,
         LoginCheck::LockedOut(retry) => {
             warn!(%ip, "admin login refused: too many failed attempts");
-            return Err(too_many_requests(retry.as_secs().max(1)));
+            return too_many_requests(retry.as_secs().max(1));
         }
-        LoginCheck::Busy => return Err(too_many_requests(1)),
+        LoginCheck::Busy => return too_many_requests(1),
     };
 
     // argon2id is deliberately slow; run it off the async workers.
@@ -121,14 +121,15 @@ pub async fn login(
         state.login_guard.record_success(ip);
         info!(%ip, "admin login");
         let generation = state.secrets.read().await.session_generation();
-        Ok((
+        (
             jar.add(session_cookie(generation)),
             Json(json!({"authenticated": true})),
-        ))
+        )
+            .into_response()
     } else {
         state.login_guard.record_failure(ip);
         warn!(%ip, "failed admin login");
-        Err(StatusCode::UNAUTHORIZED.into_response())
+        StatusCode::UNAUTHORIZED.into_response()
     }
 }
 
