@@ -20,7 +20,7 @@ use ruru_client::ClientError;
 use serde::Deserialize;
 use serde_json::json;
 use std::net::SocketAddr;
-use std::time::{SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tracing::{info, warn};
 
 use crate::security::LoginCheck;
@@ -341,6 +341,12 @@ fn pipeline_error(e: pipeline::PipelineError) -> ApiError {
 /// drops, and `ruru-source` detaches us (its ref-count falls, so it can idle-close). That
 /// is the surveillance-posture guarantee: the camera is held open only while someone is
 /// actually looking.
+/// Live preview size and rate. Enough to place calibration corners precisely (they are
+/// stored as fractions, not pixels) without saturating Wi-Fi or the browser's decoder.
+const PREVIEW_MAX_EDGE: u32 = 1280;
+const PREVIEW_INTERVAL: Duration = Duration::from_millis(200);
+const PREVIEW_QUALITY: u8 = 75;
+
 pub async fn preview(_session: Session, State(state): State<AppState>) -> Response {
     let mut sub = match state.source.subscribe().await {
         Ok(sub) => sub,
@@ -348,18 +354,39 @@ pub async fn preview(_session: Session, State(state): State<AppState>) -> Respon
     };
 
     let stream = async_stream::stream! {
+        let mut last_sent: Option<Instant> = None;
         // Ends on the first non-frame: a clean stop (source disabled/stopped) or a read
         // error. Either way the <img> stops rather than hanging.
         while let Ok(Some(frame)) = sub.next().await {
-            let mut part = Vec::with_capacity(frame.data.len() + 96);
+            // Keep reading at camera rate (so we always hold the newest frame) but only
+            // transcode and send a few per second.
+            if last_sent.is_some_and(|t| t.elapsed() < PREVIEW_INTERVAL) {
+                continue;
+            }
+            last_sent = Some(Instant::now());
+            let data = frame.data;
+            let small = tokio::task::spawn_blocking(move || {
+                pipeline::preview_frame(&data, PREVIEW_MAX_EDGE, PREVIEW_QUALITY)
+            })
+            .await;
+            let jpeg = match small {
+                Ok(Ok(jpeg)) => jpeg,
+                // A frame that won't decode (a torn MJPEG frame happens): skip it.
+                Ok(Err(e)) => {
+                    warn!(error = %e, "preview: skipping undecodable frame");
+                    continue;
+                }
+                Err(_) => break,
+            };
+            let mut part = Vec::with_capacity(jpeg.len() + 96);
             part.extend_from_slice(
                 format!(
                     "--frame\r\nContent-Type: image/jpeg\r\nContent-Length: {}\r\n\r\n",
-                    frame.data.len()
+                    jpeg.len()
                 )
                 .as_bytes(),
             );
-            part.extend_from_slice(&frame.data);
+            part.extend_from_slice(&jpeg);
             part.extend_from_slice(b"\r\n");
             yield Ok::<Bytes, std::io::Error>(Bytes::from(part));
         }

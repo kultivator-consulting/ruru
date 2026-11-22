@@ -151,6 +151,27 @@ pub async fn dewarp_preview(
     encode(&out, config.pipeline.jpeg_quality)
 }
 
+/// One frame of the admin live preview: the source JPEG shrunk to `max_edge` and
+/// re-encoded. Full 4K MJPEG at camera rate is ~100 Mbit/s per viewer and more than a
+/// browser `<img>` can decode, so the stream flickers blank; corner placement only needs a
+/// small image. CPU-bound: call from `spawn_blocking`.
+pub fn preview_frame(jpeg: &[u8], max_edge: u32, quality: u8) -> Result<Vec<u8>, PipelineError> {
+    let img = image::load_from_memory(jpeg)
+        .map_err(PipelineError::Decode)?
+        .to_rgb8();
+    let long = longest(&img);
+    let small = if long <= max_edge {
+        img
+    } else {
+        let scale = max_edge as f64 / long as f64;
+        let nw = ((img.width() as f64 * scale).round() as u32).max(1);
+        let nh = ((img.height() as f64 * scale).round() as u32).max(1);
+        // Triangle, not Lanczos: this runs several times a second and only feeds a preview.
+        image::imageops::resize(&img, nw, nh, image::imageops::FilterType::Triangle)
+    };
+    Ok(encode(&small, quality)?.jpeg)
+}
+
 // --- internals ------------------------------------------------------------
 
 async fn snapshot_rgb(source: &SourceClient) -> Result<RgbImage, PipelineError> {
@@ -227,6 +248,15 @@ fn encode(rgb: &RgbImage, quality: u8) -> Result<Encoded, PipelineError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn preview_frames_are_shrunk_to_the_preview_budget() {
+        let big = RgbImage::from_pixel(2000, 1000, image::Rgb([200, 200, 200]));
+        let src = encode(&big, 80).unwrap().jpeg;
+        let out = preview_frame(&src, 1280, 75).unwrap();
+        let img = image::load_from_memory(&out).unwrap();
+        assert_eq!((img.width(), img.height()), (1280, 640));
+    }
 
     fn uncalibrated() -> Calibration {
         Calibration {
