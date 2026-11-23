@@ -3,6 +3,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import { ApiError } from '@/api/client'
+import owl from '@/assets/brand/ruru-logo.svg'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import AppInput from '@/components/ui/AppInput.vue'
@@ -38,6 +39,7 @@ async function onSubmit(): Promise<void> {
 <template>
   <div class="mx-auto mt-16 max-w-sm">
     <SurfaceCard class="p-6">
+      <img :src="owl" alt="" width="64" height="64" class="mb-4 h-16 w-16" />
       <h1 class="text-gradient mb-1 text-xl font-semibold">Ruru admin</h1>
       <p class="mb-5 text-sm text-text-muted">Sign in to manage the whiteboard camera.</p>
 

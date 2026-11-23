@@ -1,9 +1,7 @@
 import type { Config } from 'tailwindcss'
 
-// Vendored from the embers-theme skill. Every colour maps to a CSS variable
-// defined in src/styles/tokens.css; toggling class="dark" on <html> swaps the
-// whole palette in one paint. The neutral source of truth for those values is
-// design/tokens.json (repo root) — tokens.parity.spec.ts guards they agree.
+// Every colour maps to a CSS variable defined in src/styles/tokens.css; toggling
+// class="dark" on <html> swaps the whole palette in one paint.
 export default {
   content: ['./index.html', './src/**/*.{vue,ts}'],
   darkMode: 'class',
@@ -40,6 +38,7 @@ export default {
         },
       },
       fontFamily: {
+        display: ['"Space Grotesk"', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
@@ -56,7 +55,7 @@ export default {
         card: 'var(--blur-card)',
       },
       backgroundImage: {
-        'embers-glow':
+        'page-glow':
           'radial-gradient(1200px 600px at 80% -10%, var(--bg-glow-1), transparent 60%), radial-gradient(900px 500px at -10% 110%, var(--bg-glow-2), transparent 70%)',
         'accent-gradient': 'linear-gradient(135deg, var(--accent), var(--accent-2))',
       },

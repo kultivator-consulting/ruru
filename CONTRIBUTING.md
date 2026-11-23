@@ -67,4 +67,5 @@ Your user needs to be in the `video` group to open the device.
 ## License
 
 By contributing, you agree that your contributions are dual licensed under MIT OR
-Apache-2.0, the same as the project, without any additional terms or conditions.
+Apache-2.0, the same as the project, without any additional terms or conditions. The Ruru
+name and logo are excluded; see [TRADEMARKS.md](TRADEMARKS.md).

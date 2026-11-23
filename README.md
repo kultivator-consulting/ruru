@@ -1,3 +1,8 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/brand/ruru-lockup-dark.svg">
+  <img src="docs/brand/ruru-lockup.svg" alt="Ruru" height="120">
+</picture>
+
 # Ruru
 
 **Let an AI agent read your office whiteboard.**
@@ -178,7 +183,7 @@ and `enable`. [`examples/ruru-tap`](examples/ruru-tap) is a minimal subscriber.
 | `web/` | Admin panel (Vite + Vue 3 + Tailwind), embedded into `ruru-mcp` at build time. |
 | `config/` | Dev configs for the mock camera. |
 | `deploy/` | systemd units, production configs, install/uninstall scripts. |
-| `docs/` | The deploy runbook. |
+| `docs/` | The deploy runbook, README images, and brand assets (see [TRADEMARKS.md](TRADEMARKS.md)). |
 
 ## Contributing
 
@@ -193,5 +198,8 @@ Licensed under either of [Apache License, Version 2.0](LICENSE-APACHE) or
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion
 in this project by you, as defined in the Apache-2.0 license, shall be dual licensed as
 above, without any additional terms or conditions.
+
+The Ruru name and owl logo are trademarks of Kultivator Consulting Ltd and are **not** covered
+by either licence. Forks must use a different name and logo. See [TRADEMARKS.md](TRADEMARKS.md).
 
 Built by [Kultivator Consulting](https://kultivator.co.nz) in Aotearoa New Zealand.
