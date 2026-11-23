@@ -241,6 +241,32 @@ async fn preview_streams_multipart_mjpeg() {
 }
 
 #[tokio::test]
+async fn preview_ends_when_the_server_shuts_down() {
+    // An open preview must not hold graceful shutdown (and so a restart) hostage.
+    let h = Harness::start().await;
+    h.login().await;
+    let mut resp = h
+        .client
+        .get(format!("{}/api/preview.mjpeg", h.base))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+    assert!(
+        resp.chunk().await.unwrap().is_some(),
+        "expected a first frame"
+    );
+
+    h.state.begin_shutdown();
+
+    let drained = tokio::time::timeout(std::time::Duration::from_secs(5), async {
+        while resp.chunk().await.unwrap().is_some() {}
+    })
+    .await;
+    assert!(drained.is_ok(), "preview stream kept going after shutdown");
+}
+
+#[tokio::test]
 async fn preview_requires_a_session() {
     let h = Harness::start().await;
     let resp = h

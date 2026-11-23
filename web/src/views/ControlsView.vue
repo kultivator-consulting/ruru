@@ -1,25 +1,27 @@
 <script setup lang="ts">
 import { storeToRefs } from 'pinia'
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted } from 'vue'
 
 import AlertBanner from '@/components/ui/AlertBanner.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import Pill from '@/components/ui/Pill.vue'
 import SurfaceCard from '@/components/ui/SurfaceCard.vue'
+import { usePreviewStream } from '@/composables/usePreviewStream'
 import { type Control, useCameraStore } from '@/stores/camera.store'
 
 const camera = useCameraStore()
 const { status, controls, error } = storeToRefs(camera)
 
-// Bumped to force the <img> to reconnect the MJPEG stream after enabling.
-const previewKey = ref(0)
 let poll: number | undefined
 
-// The stream is only requested while the camera is enabled and this view is mounted —
-// leaving the page unmounts the <img>, which aborts the request and detaches us from the
-// source, so it can idle-close. That is the "open only while someone is looking" posture.
-const previewSrc = computed(() =>
-  status.value?.enabled ? `/api/preview.mjpeg?k=${previewKey.value}` : null,
+// The stream is only requested while the camera is enabled, this view is mounted and the
+// tab is visible, and it pauses after a while — dropping the <img> src aborts the request
+// and detaches us from the source, so it can idle-close. That is the "open only while
+// someone is looking" posture.
+const enabled = computed(() => status.value?.enabled ?? false)
+const { src: previewSrc, paused, restart: resumePreview } = usePreviewStream(
+  '/api/preview.mjpeg',
+  enabled,
 )
 
 async function onSet(control: Control, event: Event): Promise<void> {
@@ -30,13 +32,12 @@ async function onSet(control: Control, event: Event): Promise<void> {
 async function toggleEnable(): Promise<void> {
   const next = !status.value?.enabled
   await camera.setEnabled(next)
-  if (next) previewKey.value++
+  if (next) resumePreview()
   await camera.refresh()
 }
 
 onMounted(async () => {
   await camera.refresh()
-  previewKey.value++
   poll = window.setInterval(() => void camera.refreshStatus(), 3000)
 })
 
@@ -65,7 +66,11 @@ onBeforeUnmount(() => {
           class="h-full w-full object-contain"
           data-test="preview"
         />
-        <span v-else class="text-sm text-text-muted">camera disabled</span>
+        <div v-else-if="paused" class="flex flex-col items-center gap-2 text-sm text-text-muted">
+          <span>Preview paused to release the camera</span>
+          <AppButton size="sm" data-test="resume-preview" @click="resumePreview">Resume</AppButton>
+        </div>
+        <span v-else-if="!enabled" class="text-sm text-text-muted">camera disabled</span>
       </div>
     </SurfaceCard>
 

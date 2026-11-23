@@ -27,7 +27,7 @@ const showChrome = computed(() => auth.authenticated)
 <template>
   <div class="min-h-screen">
     <header
-      class="sticky top-0 z-10 border-b border-hairline bg-surface/70 backdrop-blur-card"
+      class="sticky top-0 z-10 border-b border-hairline bg-header backdrop-blur-card"
     >
       <div class="mx-auto flex max-w-5xl items-center justify-between gap-4 px-4 py-3">
         <Wordmark />

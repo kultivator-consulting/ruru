@@ -24,6 +24,9 @@ pub struct Harness {
     pub secrets_path: std::path::PathBuf,
     pub calibration_path: std::path::PathBuf,
     pub client: reqwest::Client,
+    /// The server's state, for driving it directly (e.g. `begin_shutdown`).
+    #[allow(dead_code)] // only some test binaries use it
+    pub state: AppState,
     _source: Option<RunningSource>,
     _dir: TempDir,
     server: tokio::task::JoinHandle<()>,
@@ -98,7 +101,7 @@ impl Harness {
         )
         .expect("app state");
 
-        let app = ruru_mcp::build_router(state)
+        let app = ruru_mcp::build_router(state.clone())
             .into_make_service_with_connect_info::<std::net::SocketAddr>();
         let server = tokio::spawn(async move {
             axum::serve(listener, app).await.ok();
@@ -109,6 +112,7 @@ impl Harness {
             bearer,
             secrets_path,
             calibration_path,
+            state,
             client: reqwest::Client::builder()
                 .cookie_store(true)
                 .build()

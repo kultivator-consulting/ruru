@@ -16,6 +16,7 @@ export default {
         surface: 'var(--surface)',
         'surface-2': 'var(--surface-2)',
         'surface-muted': 'var(--surface-muted)',
+        header: 'var(--header-bg)',
 
         hairline: 'var(--hairline)',
         'hairline-strong': 'var(--hairline-strong)',

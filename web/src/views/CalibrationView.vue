@@ -4,6 +4,7 @@ import { onBeforeUnmount, onMounted, ref } from 'vue'
 import AlertBanner from '@/components/ui/AlertBanner.vue'
 import AppButton from '@/components/ui/AppButton.vue'
 import SurfaceCard from '@/components/ui/SurfaceCard.vue'
+import { usePreviewStream } from '@/composables/usePreviewStream'
 import { type Corners, useCalibrationStore } from '@/stores/calibration.store'
 
 const cal = useCalibrationStore()
@@ -120,8 +121,10 @@ async function reset(): Promise<void> {
   await refreshPreview()
 }
 
-// A runtime string, not a build-time asset — Vite must not try to resolve it.
-const rawPreviewSrc = '/api/preview.mjpeg'
+// A runtime string, not a build-time asset — Vite must not try to resolve it. Pauses when
+// the tab is hidden or after a while, so a forgotten tab doesn't hold the camera open.
+const { src: rawPreviewSrc, paused, restart: resumePreview } =
+  usePreviewStream('/api/preview.mjpeg')
 
 const polygonPoints = () => pts.value.map((p) => p.join(',')).join(' ')
 </script>
@@ -150,11 +153,21 @@ const polygonPoints = () => pts.value.map((p) => p.join(',')).join(' ')
             class="relative aspect-video select-none overflow-hidden rounded-lg border border-hairline bg-surface-muted"
           >
             <img
+              v-if="rawPreviewSrc"
               :src="rawPreviewSrc"
               alt="raw camera preview"
               class="pointer-events-none h-full w-full object-contain"
               draggable="false"
             />
+            <div
+              v-else-if="paused"
+              class="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 text-sm text-text-muted"
+            >
+              <span>Preview paused to release the camera</span>
+              <AppButton size="sm" data-test="resume-preview" @click="resumePreview">
+                Resume
+              </AppButton>
+            </div>
             <svg
               class="pointer-events-none absolute inset-0 h-full w-full"
               viewBox="0 0 1 1"

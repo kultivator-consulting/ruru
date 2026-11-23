@@ -335,29 +335,50 @@ fn pipeline_error(e: pipeline::PipelineError) -> ApiError {
     }
 }
 
-/// Live preview: proxy `ruru-source`'s `subscribe()` stream as `multipart/x-mixed-replace`
-/// so an `<img>` shows live video. The subscription is held only while this response body
-/// is alive — when the browser closes the tab, axum drops the stream, the `FrameStream`
-/// drops, and `ruru-source` detaches us (its ref-count falls, so it can idle-close). That
-/// is the surveillance-posture guarantee: the camera is held open only while someone is
-/// actually looking.
 /// Live preview size and rate. Enough to place calibration corners precisely (they are
 /// stored as fractions, not pixels) without saturating Wi-Fi or the browser's decoder.
 const PREVIEW_MAX_EDGE: u32 = 1280;
 const PREVIEW_INTERVAL: Duration = Duration::from_millis(200);
 const PREVIEW_QUALITY: u8 = 75;
+/// A single preview stream ends after this long. The panel pauses itself sooner (hidden
+/// tab, idle timer) and offers a Resume button; this is the server-side backstop so a
+/// forgotten tab can't keep the camera open indefinitely.
+pub const PREVIEW_MAX_DURATION: Duration = Duration::from_secs(10 * 60);
 
+/// Live preview: proxy `ruru-source`'s `subscribe()` stream as `multipart/x-mixed-replace`
+/// so an `<img>` shows live video. The subscription is held only while this response body
+/// is alive — when the browser closes the tab, axum drops the stream, the `FrameStream`
+/// drops, and `ruru-source` detaches us (its ref-count falls, so it can idle-close). That
+/// is the surveillance-posture guarantee: the camera is held open only while someone is
+/// actually looking. The stream also ends on its own after [`PREVIEW_MAX_DURATION`] and
+/// as soon as the server starts shutting down.
 pub async fn preview(_session: Session, State(state): State<AppState>) -> Response {
     let mut sub = match state.source.subscribe().await {
         Ok(sub) => sub,
         Err(e) => return ApiError::from(e).into_response(),
     };
+    let shutting_down = state.shutting_down();
+    let expires = tokio::time::sleep(PREVIEW_MAX_DURATION);
 
     let stream = async_stream::stream! {
         let mut last_sent: Option<Instant> = None;
-        // Ends on the first non-frame: a clean stop (source disabled/stopped) or a read
-        // error. Either way the <img> stops rather than hanging.
-        while let Ok(Some(frame)) = sub.next().await {
+        tokio::pin!(shutting_down, expires);
+        loop {
+            // Ends on shutdown, on the duration cap, or on the first non-frame: a clean
+            // stop (source disabled/stopped) or a read error. Either way the <img> stops
+            // rather than hanging.
+            let frame = tokio::select! {
+                biased;
+                () = &mut shutting_down => break,
+                () = &mut expires => {
+                    info!("preview: duration cap reached, ending stream");
+                    break;
+                }
+                next = sub.next() => match next {
+                    Ok(Some(frame)) => frame,
+                    _ => break,
+                },
+            };
             // Keep reading at camera rate (so we always hold the newest frame) but only
             // transcode and send a few per second.
             if last_sent.is_some_and(|t| t.elapsed() < PREVIEW_INTERVAL) {

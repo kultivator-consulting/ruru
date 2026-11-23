@@ -33,7 +33,7 @@ use ruru_client::SourceClient;
 use secrets::Secrets;
 use std::net::SocketAddr;
 use std::sync::Arc;
-use tokio::sync::{RwLock, Semaphore};
+use tokio::sync::{RwLock, Semaphore, watch};
 use tracing::{info, warn};
 
 /// Shared handler state. Cheap to clone (everything inside is `Arc` or already cheap).
@@ -53,6 +53,9 @@ pub struct AppState {
     pub login_guard: Arc<security::LoginGuard>,
     /// Bounds concurrent image-processing tool calls on `/mcp` (dewarping 4K is CPU-heavy).
     pub capture_permits: Arc<Semaphore>,
+    /// Flips to `true` when the process starts shutting down. Long-lived responses (the
+    /// live preview) watch it and end, so graceful shutdown doesn't wait on them forever.
+    shutdown: Arc<watch::Sender<bool>>,
 }
 
 impl AppState {
@@ -75,7 +78,22 @@ impl AppState {
             captures,
             login_guard: Arc::new(security::LoginGuard::default()),
             capture_permits: Arc::new(Semaphore::new(permits)),
+            shutdown: Arc::new(watch::Sender::new(false)),
         })
+    }
+
+    /// Tell long-lived responses to finish. Idempotent.
+    pub fn begin_shutdown(&self) {
+        self.shutdown.send_replace(true);
+    }
+
+    /// Resolves once [`begin_shutdown`](Self::begin_shutdown) has been called.
+    pub fn shutting_down(&self) -> impl std::future::Future<Output = ()> + Send + 'static {
+        let mut rx = self.shutdown.subscribe();
+        async move {
+            // Err means the sender is gone, which only happens at teardown: treat as shutdown.
+            let _ = rx.wait_for(|stopping| *stopping).await;
+        }
     }
 }
 
@@ -158,7 +176,7 @@ pub async fn serve(config: Config) -> Result<()> {
     let source = SourceClient::new(&config.source.socket_path);
     let state = AppState::new(config.clone(), secrets, calibration, source, captures)?;
 
-    let app = build_router(state);
+    let app = build_router(state.clone());
     let listener = tokio::net::TcpListener::bind(config.server.bind)
         .await
         .with_context(|| format!("binding {}", config.server.bind))?;
@@ -167,16 +185,41 @@ pub async fn serve(config: Config) -> Result<()> {
         source = %config.source.socket_path.display(),
         "ruru-mcp listening"
     );
+    // On SIGTERM/Ctrl-C, flag shutdown so live previews end, then let axum drain.
+    let signalled = state.clone();
+    tokio::spawn(async move {
+        shutdown_signal().await;
+        signalled.begin_shutdown();
+    });
+
     // Peer addresses feed the per-IP login throttle.
-    axum::serve(
+    let server = axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
     )
-    .with_graceful_shutdown(shutdown_signal())
-    .await
-    .context("server error")?;
+    .with_graceful_shutdown(state.shutting_down());
+
+    // Backstop: anything still open SHUTDOWN_GRACE after the signal (a stuck client, a
+    // stream we didn't think of) must not hold the restart hostage until systemd kills us.
+    let deadline = {
+        let stopping = state.shutting_down();
+        async move {
+            stopping.await;
+            tokio::time::sleep(SHUTDOWN_GRACE).await;
+        }
+    };
+    tokio::select! {
+        res = server => res.context("server error")?,
+        () = deadline => warn!(
+            grace_secs = SHUTDOWN_GRACE.as_secs(),
+            "connections still open after the shutdown grace period; exiting anyway"
+        ),
+    }
     Ok(())
 }
+
+/// How long graceful shutdown may wait for in-flight requests before we exit anyway.
+const SHUTDOWN_GRACE: std::time::Duration = std::time::Duration::from_secs(5);
 
 async fn shutdown_signal() {
     use tokio::signal::unix::{SignalKind, signal};

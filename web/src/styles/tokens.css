@@ -19,6 +19,7 @@
   --surface: rgba(255, 252, 246, 0.70);   /* translucent card */
   --surface-2: rgba(255, 252, 246, 0.88); /* slightly opaquer */
   --surface-muted: rgba(46, 28, 20, 0.04); /* nested / inset block */
+  --header-bg: rgba(246, 239, 226, 0.92); /* sticky header: near-opaque page colour */
 
   /* Borders / dividers */
   --hairline: rgba(46, 28, 20, 0.10);
@@ -59,6 +60,7 @@
   --surface: rgba(46, 28, 20, 0.55);
   --surface-2: rgba(46, 28, 20, 0.80);
   --surface-muted: rgba(244, 232, 211, 0.05);
+  --header-bg: rgba(20, 12, 8, 0.92);
 
   --hairline: rgba(244, 232, 211, 0.09);
   --hairline-strong: rgba(244, 232, 211, 0.16);

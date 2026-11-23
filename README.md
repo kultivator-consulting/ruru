@@ -50,7 +50,8 @@ flowchart LR
   Vue admin panel.
 - The camera is only open **while something is looking**. It opens on the first request
   and idle-closes after the last one. An always-on camera in an office is a surveillance
-  device, so that's the default, and every open and close is logged.
+  device, so that's the default, and every open and close is logged. The admin panel's live
+  preview counts as looking, so it pauses when its tab is hidden and after 10 minutes.
 
 ### MCP tools
 
